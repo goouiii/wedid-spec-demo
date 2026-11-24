@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-wd-g: #44695b;
+  --color-wd-gd: #375749;
+  --color-wd-gl: #dce8e1;
+  --color-wd-bg: #f4f4ef;
+  --color-wd-nav: #f8f8f4;
+  --color-wd-card: #fbfbf8;
+  --color-wd-line: #d4d4cf;
+  --color-wd-line2: #ebebe6;
+  --color-wd-foot: #efefea;
+  --color-wd-side: #f6f6f2;
+  --color-wd-side2: #efefea;
+}
+
+html { font-family: Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+body { margin: 0; }
+button:not(:disabled) { cursor: pointer; }
+.font-serif { font-family: 'Cormorant Garamond', 'Times New Roman', Georgia, serif; }
+
+@media print {
+  .no-print { display: none !important; }
+  body, .min-h-screen { background: #fff !important; }
+  .avoid-break { break-inside: avoid; }
+  .frame-scroll { max-height: none !important; overflow: visible !important; }
+  main { max-width: none !important; }
+}
