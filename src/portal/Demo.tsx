@@ -78,7 +78,7 @@ export function DemoPage() {
               <div ref={scrollRef} className="relative overflow-y-auto overflow-x-hidden" style={{ height: viewH / scale }}>
                 <DemoCtx.Provider value={api}>
                   <OverlayCtx.Provider value={overlay}>
-                    <div ref={contentRef}><ScreenView id={id} /></div>
+                    <div ref={contentRef} style={{ ["--win-h" as string]: `${viewH / scale}px` }}><ScreenView id={id} /></div>
                   </OverlayCtx.Provider>
                 </DemoCtx.Provider>
               </div>

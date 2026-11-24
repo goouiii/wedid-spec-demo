@@ -51,7 +51,7 @@ export function Footer({ anno }: { anno?: Anno }) {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <div className="relative flex min-h-[900px] w-[1440px] flex-col bg-wd-bg text-[#1d1d1b]">{children}</div>
+  return <div className="relative flex min-h-[max(900px,var(--win-h,0px))] w-[1440px] flex-col bg-wd-bg text-[#1d1d1b]">{children}</div>
 }
 
 type BtnKind = 'primary' | 'outline' | 'soft' | 'ghost'
