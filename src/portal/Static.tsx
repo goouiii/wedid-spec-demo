@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DemoCtx, seedFor, type ScreenId } from '../demo/state'
-import { ScreenView } from '../screens/screens'
+import { Screen } from '../screens'
 import { SCREEN_MIN_H, SCREEN_W } from '../screens/ui'
 
 export const FRAME_W = SCREEN_W
@@ -27,7 +27,7 @@ export function StaticScreen({ id }: { id: ScreenId }) {
   return (
     <DemoCtx.Provider value={api}>
       <BrowserFrame>
-        <div inert className="select-none"><ScreenView id={id} /></div>
+        <div inert className="select-none"><Screen id={id} /></div>
       </BrowserFrame>
     </DemoCtx.Provider>
   )
@@ -41,7 +41,7 @@ export function ScaledStatic({ id, scale }: { id: ScreenId; scale: number }) {
     <div className="relative mx-auto max-w-full overflow-hidden rounded-lg" style={{ width: FRAME_W * scale, height: h }} aria-hidden>
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: FRAME_W }}>
         <DemoCtx.Provider value={api}>
-          <BrowserFrame><div inert><ScreenView id={id} /></div></BrowserFrame>
+          <BrowserFrame><div inert><Screen id={id} /></div></BrowserFrame>
         </DemoCtx.Provider>
       </div>
     </div>

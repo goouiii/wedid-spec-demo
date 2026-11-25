@@ -1,27 +1,61 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { RotateCcw } from 'lucide-react'
-import { DemoCtx, ensure, reducer, seedFor, type DemoState, type ScreenId } from '../demo/state'
-import { ScreenView } from '../screens/screens'
+import { DemoCtx, ensure, reducer, seedFor, weddingDate, type Act, type DemoState, type LoginReason, type ScreenId } from '../demo/state'
+import { Screen } from '../screens'
+import { budgetError, parseNum } from '../screens/ui'
+import { regionLacksData, venueById } from '../data/mock'
 import { OverlayCtx, SCREEN_W } from '../screens/ui'
 import { SPEC, screenById } from '../data/spec'
 import { BAR_H, BrowserFrame, useHeight } from './Static'
 
 const firstId = SPEC.screens[0].id
 
-/** 지금 상태가 어떤 화면 정의서 항목에 해당하는지 (변형 · 모달 포함) */
+const LOGIN_SCREEN: Record<LoginReason, ScreenId> = { save: 'LOGIN-01', step: 'LOGIN-02', todo: 'LOGIN-03', invite: 'LOGIN-04', cand: 'LOGIN-05', join: 'INVITE-03' }
+const ROAD_BASE = new Set<string>(['LOGIN-04', 'INVITE-01', 'STEP-06', 'STEP-07'])
+const STEP_BASE = new Set<string>(['LOGIN-02', 'LOGIN-03', 'LOGIN-05'])
+
+/** 지금 상태가 어떤 화면 정의서 항목에 해당하는지 (변형 · 팝업 포함) */
 function detect(id: ScreenId, s: DemoState): ScreenId {
-  if (s.login) return 'SCR-11'
-  if (s.invite) return 'SCR-11-B'
-  if (s.panel) return 'SCR-03-B'
-  if (id.startsWith('SCR-03')) return !s.a.budget ? 'SCR-03-C' : s.a.guests === '아직 모르겠어요' ? 'SCR-03-E' : s.basis ? 'SCR-03-F' : 'SCR-03'
-  if (id === 'SCR-06' || id === 'SCR-06-E' || id === 'SCR-06-F') return s.pastOpen ? 'SCR-06-F' : s.a.when.mode === 'none' ? 'SCR-06-E' : 'SCR-06'
-  if (id === 'SCR-06-D' || id === 'SCR-06-B' || id === 'SCR-06-C') {
-    if (s.banner !== null) return 'SCR-06-B'
-    if (!s.a.budget && s.stages[s.view].done) return 'SCR-06-C'
-    return s.view === 2 ? 'SCR-06-D2' : 'SCR-06-D'
+  if (s.login) return LOGIN_SCREEN[s.login.reason]
+  if (s.inviteOpen) return 'INVITE-01'
+  if (s.newPlanOpen) return 'MAIN-04'
+  if (s.profileOpen) return 'HOME-03'
+  if (s.unlinkOpen) return 'MY-02'
+  if (s.clearOpen) return 'VENDOR-05'
+  if (s.cancelOpen) return 'STEP-05'
+  if (s.todoOpen) return 'STEP-06'
+  if (s.dateModal) return 'ROAD-05'
+  if (s.pastOpen) return 'ROAD-07'
+  const p = id.split('-')[0]
+  if (id === 'Q-02' || id === 'Q-03') return !s.a.noBudget && budgetError(parseNum(s.a.budgetText)) ? 'Q-03' : 'Q-02'
+  if ((p === 'COST' && id !== 'COST-01') || id === 'LOGIN-01') {
+    if (s.panel) return 'COST-06'
+    if (s.shared) return 'COST-07'
+    if (s.loggedIn) return 'COST-08'
+    if (s.basis) return 'COST-05'
+    if (!s.a.budget) return 'COST-03'
+    return s.a.guests === '아직 모르겠어요' ? 'COST-04' : 'COST-02'
   }
-  if (id === 'SCR-01' && s.plan && s.loggedIn) return 'SCR-01-B'
+  if (p === 'ROAD' || ROAD_BASE.has(id)) {
+    if (!s.loggedIn) return 'ROAD-01'
+    if (s.stages.every((x) => x.done)) return 'ROAD-03'
+    if (weddingDate(s.a.when).estimated) return 'ROAD-04'
+    return s.a.budget ? 'ROAD-02' : 'ROAD-06'
+  }
+  if (p === 'STEP' || STEP_BASE.has(id)) {
+    const done = s.stages[s.view]?.done
+    if (s.view === 2) return done ? 'STEP-04' : 'STEP-03'
+    return done ? 'STEP-02' : 'STEP-01'
+  }
+  if (p === 'VENUE') return !s.loggedIn ? 'VENUE-04' : regionLacksData(s.vf.region) ? 'VENUE-03' : s.vf.grid ? 'VENUE-02' : 'VENUE-01'
+  if (p === 'SDM') return s.loggedIn ? 'SDM-01' : 'SDM-02'
+  if (id === 'VENDOR-01' || id === 'VENDOR-02') return venueById(s.vendor)?.status === '휴업' ? 'VENDOR-02' : 'VENDOR-01'
+  if (p === 'VENDOR') return s.compare.length ? 'VENDOR-03' : 'VENDOR-04'
+  if (p === 'HOME') return s.stages.every((x) => x.done) ? 'HOME-02' : 'HOME-01'
+  if (p === 'INVITE') return s.invite === 'expired' ? 'INVITE-04' : s.invite === 'linked' ? 'INVITE-05' : 'INVITE-02'
+  if (p === 'MY') return 'MY-01'
+  if (id === 'MAIN-04') return 'MAIN-03'
   return id
 }
 
@@ -30,22 +64,35 @@ export function DemoPage() {
   const params = useParams()
   const id = (screenById(params.id ?? '') ? params.id : firstId) as ScreenId
   const nav = useNavigate()
-  const [s, dispatch] = useReducer(reducer, id, seedFor)
+  const [s, raw] = useReducer(reducer, id, seedFor)
   const scrollRef = useRef<HTMLDivElement>(null)
   const go = useCallback((to: ScreenId) => { nav(`/demo/${to}`); scrollRef.current?.scrollTo({ top: 0 }) }, [nav])
+  const sRef = useRef(s)
+  useEffect(() => { sRef.current = s }, [s])
+  /** 로그인 뒤 이동(goAfter)처럼 화면 이동이 따르는 동작을 처리한다 */
+  const dispatch = useCallback((a: Act) => {
+    const cur = sRef.current
+    if (a.type === 'needLogin' && cur.loggedIn && a.goAfter) go(a.goAfter)
+    if (a.type === 'loginOk' && cur.login) {
+      if (cur.login.reason === 'join') go('ROAD-02')
+      else if (cur.login.goAfter) go(cur.login.goAfter)
+    }
+    raw(a)
+  }, [go])
   const [overlay, setOverlay] = useState<HTMLDivElement | null>(null)
   const [contentRef, contentH] = useHeight<HTMLDivElement>()
 
+  /** 계획이 필요한 화면으로 '이동'했을 때만 그 화면 기본 상태로 맞춘다 (상태 교체 직후의 경합 방지) */
   useEffect(() => {
-    const fix = ensure(id, s)
-    if (fix) dispatch({ type: 'replace', state: fix })
-  }, [id, s])
+    const fix = ensure(id, sRef.current)
+    if (fix) raw({ type: 'replace', state: fix })
+  }, [id])
 
   useEffect(() => {
     if (!s.toast) return
     const t = setTimeout(() => dispatch({ type: 'set', patch: { toast: null } }), 2600)
     return () => clearTimeout(t)
-  }, [s.toast])
+  }, [s.toast, dispatch])
 
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 1100, h: 700 })
@@ -63,7 +110,7 @@ export function DemoPage() {
   const scale = Math.min(1, box.w / SCREEN_W)
   const viewH = box.h - BAR_H * scale
 
-  const api = useMemo(() => ({ s, dispatch, go, readonly: false, docId: null }), [s, go])
+  const api = useMemo(() => ({ s, dispatch, go, readonly: false, docId: null }), [s, dispatch, go])
   const now = detect(id, s)
   const sc = screenById(now)!
 
@@ -78,7 +125,7 @@ export function DemoPage() {
               <div ref={scrollRef} className="relative overflow-y-auto overflow-x-hidden" style={{ height: viewH / scale }}>
                 <DemoCtx.Provider value={api}>
                   <OverlayCtx.Provider value={overlay}>
-                    <div ref={contentRef} style={{ ["--win-h" as string]: `${viewH / scale}px` }}><ScreenView id={id} /></div>
+                    <div ref={contentRef} style={{ ["--win-h" as string]: `${viewH / scale}px` }}><Screen id={id} /></div>
                   </OverlayCtx.Provider>
                 </DemoCtx.Provider>
               </div>
@@ -115,19 +162,20 @@ export function DemoPage() {
             다음 로그인 실패시키기
           </label>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <SimBtn disabled={!s.plan || !s.loggedIn || s.partner === 'joined'} onClick={() => dispatch({ type: 'set', patch: { partner: 'joined', toast: '짝꿍이 합류했어요' } })}>짝꿍 합류</SimBtn>
-            <SimBtn disabled={s.partner !== 'joined'} onClick={() => dispatch({ type: 'set', patch: { partnerEdited: true, checks: s.checks.map((c, i) => (i === s.view ? c.map((v, j) => (j === 2 ? true : v)) : c)), toast: '짝꿍이 할 일을 체크했어요' } })}>짝꿍이 체크</SimBtn>
-            <SimBtn onClick={() => { dispatch({ type: 'set', patch: { invite: { hasPlan: s.plan }, login: null, panel: false } }); go('SCR-11-B') }}>초대 링크로 접속</SimBtn>
-            <SimBtn disabled={!s.plan} onClick={() => { dispatch({ type: 'recalc', a: { ...s.a, when: { mode: 'date', date: '2027-04-17', year: '2027', month: '4' } } }); go('SCR-06') }}>예식일 앞당기기</SimBtn>
+            <SimBtn disabled={!s.plan || !s.loggedIn || s.partner === 'joined'} onClick={() => dispatch({ type: 'set', patch: { partner: 'joined', toast: '민지 님이 합류했어요' } })}>짝꿍 합류</SimBtn>
+            <SimBtn disabled={s.partner !== 'joined'} onClick={() => { const st = s.stages.findIndex((x) => !x.done); const j = s.todos[st]?.findIndex((t) => t.owner === '짝꿍' && !t.done) ?? -1; if (j >= 0) dispatch({ type: 'check', stage: st, i: j }); dispatch({ type: 'toast', text: '짝꿍이 할 일을 체크했어요' }) }}>짝꿍이 체크</SimBtn>
+            <SimBtn onClick={() => { dispatch({ type: 'replace', state: seedFor('INVITE-02') }); go('INVITE-02') }}>초대 링크로 접속</SimBtn>
+            <SimBtn onClick={() => { dispatch({ type: 'replace', state: seedFor('INVITE-04') }); go('INVITE-04') }}>만료된 링크 접속</SimBtn>
+            <SimBtn disabled={!s.plan} onClick={() => { dispatch({ type: 'recalc', a: { ...s.a, when: { mode: 'date', date: '2027-02-13', year: '2027', month: '2' } } }); go(s.loggedIn ? 'ROAD-02' : 'ROAD-01') }}>예식일 앞당기기</SimBtn>
           </div>
-          <p className="mt-2 text-[11px] text-neutral-400">예식일 앞당기기 = 2027.04.17로 바꿔 지난 단계 확인(SCR-06-F)을 띄워요.</p>
+          <p className="mt-2 text-[11px] text-neutral-400">예식일 앞당기기 = 2027.02.13(D-90)으로 바꿔 지난 단계 확인(ROAD-07)을 띄워요.</p>
         </section>
 
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-[12.5px] leading-relaxed text-amber-900">
           <p className="font-bold">Mock 범위</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
-            <li>오늘 날짜는 2026.11.24로 고정이에요.</li>
-            <li>금액은 화면 정의서 예시값에 맞춘 Mock, 업체는 모두 예시 이름이에요(실제 업체 사진 · 소개글 없음).</li>
+            <li>오늘 날짜는 디자인 기준인 2026.11.15로 고정이에요 (D-334).</li>
+            <li>금액은 디자인 예시값에 맞춘 Mock, 업체는 모두 '예시' 이름이고 사진은 일러스트로 대체했어요.</li>
             <li>카카오 · 구글 로그인, 링크 발급, 클립보드 외 공유는 실제로 처리하지 않아요.</li>
             <li>상태는 이 탭에서만 유지되고 새로고침하면 지금 화면 기본 상태로 돌아가요.</li>
           </ul>

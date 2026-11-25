@@ -3,13 +3,14 @@ import { ArrowRight, ExternalLink, FileText, Play } from 'lucide-react'
 import { CORE_FLOW, NOTION_PAGE, SPEC, screenById } from '../data/spec'
 import { ScaledStatic } from './Static'
 
-const GROUPS: { title: string; prefix: string[] }[] = [
-  { title: '첫 화면', prefix: ['SCR-01'] },
-  { title: '질문 5개', prefix: ['SCR-02'] },
-  { title: '예상 비용 결과', prefix: ['SCR-03'] },
-  { title: '준비 로드맵', prefix: ['SCR-06'] },
-  { title: '후보 보기', prefix: ['SCR-09', 'SCR-10'] },
-  { title: '로그인 · 초대', prefix: ['SCR-11'] },
+/** DESIGN 135-472의 6개 섹션 */
+const GROUPS: { title: string; ids: string[] }[] = [
+  { title: '01 첫 방문 · 비용 계산', ids: ['MAIN-01', 'MAIN-02', 'Q-01', 'Q-02', 'Q-03', 'Q-04', 'COST-01', 'COST-02', 'COST-03', 'COST-04', 'COST-05', 'COST-06', 'COST-07', 'ROAD-01', 'LOGIN-01'] },
+  { title: '02 로드맵 · 단계 진행', ids: ['ROAD-02', 'ROAD-03', 'ROAD-04', 'ROAD-05', 'ROAD-06', 'ROAD-07', 'STEP-01', 'STEP-02', 'STEP-03', 'STEP-04', 'STEP-05', 'STEP-06', 'STEP-07'] },
+  { title: '03 업체 찾기 · 비교', ids: ['VENUE-01', 'VENUE-02', 'VENUE-03', 'VENUE-04', 'VENDOR-01', 'VENDOR-02', 'VENDOR-03', 'VENDOR-04', 'VENDOR-05', 'SDM-01', 'SDM-02'] },
+  { title: '04 재방문 (로그인)', ids: ['MAIN-03', 'MAIN-04', 'HOME-01', 'HOME-02', 'HOME-03', 'COST-08'] },
+  { title: '05 짝꿍 초대 · 내 정보', ids: ['INVITE-01', 'INVITE-02', 'INVITE-03', 'INVITE-04', 'INVITE-05', 'MY-01', 'MY-02'] },
+  { title: '06 로그인 팝업', ids: ['LOGIN-02', 'LOGIN-03', 'LOGIN-04', 'LOGIN-05'] },
 ]
 
 export function FlowPage() {
@@ -24,7 +25,7 @@ export function FlowPage() {
           <a href={NOTION_PAGE} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-neutral-300 px-3 py-2 text-[13px] hover:bg-neutral-50">Notion 원문 (화면 정의서 · 기능명세서) <ExternalLink size={13} /></a>
         </div>
         <div className="mt-5">
-          <p className="mb-2 text-[12px] font-bold text-neutral-500">핵심 흐름 · 비용 확인부터 스드메 계약까지 <span className="font-normal text-neutral-400">(UT 11/28 범위 · 기능명세 시나리오 Step 0~12)</span></p>
+          <p className="mb-2 text-[12px] font-bold text-neutral-500">핵심 흐름 · 첫 방문부터 스드메 계약까지 <span className="font-normal text-neutral-400">(DESIGN 135-472 메인 플로우)</span></p>
           <ol className="flex flex-wrap items-stretch gap-2">
             {CORE_FLOW.map((c, i) => {
               const s = screenById(c.id)!
@@ -44,7 +45,7 @@ export function FlowPage() {
       </section>
 
       {GROUPS.map((g) => {
-        const list = SPEC.screens.filter((s) => g.prefix.some((p) => s.id === p || s.id.startsWith(p + '-')))
+        const list = g.ids.map((x) => screenById(x)!).filter(Boolean)
         return (
           <section key={g.title}>
             <h3 className="mb-3 px-1 text-[16px] font-extrabold">{g.title} <span className="text-neutral-400">{list.length}</span></h3>

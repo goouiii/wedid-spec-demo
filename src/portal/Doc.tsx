@@ -6,7 +6,7 @@ import { AnnotatedFrame } from './Frame'
 import type { ScreenId } from '../demo/state'
 
 const order = SPEC.screens.map((s) => s.id)
-const ID_RE = /(SCR-\d{2}(?:-(?:Q\d|D2|[A-F]))?)/g
+const ID_RE = /((?:MAIN|Q|COST|ROAD|STEP|LOGIN|VENUE|VENDOR|SDM|HOME|INVITE|MY)-\d{2}|FR-(?:D)?\d{2})/g
 
 /** 문장 안의 화면 ID를 문서 링크로 */
 function Linked({ text }: { text: string }) {
@@ -69,7 +69,7 @@ function FeatureCard({ f }: { f: FeatureSpec }) {
     ['데이터 · 로직', f.logic],
     ['성공 결과', f.success],
     ['예외 · 제한사항', f.exception],
-    ['시나리오', f.req ? `기획서 핵심 시나리오 ${f.req}` : '원문 미기재'],
+    ['시나리오', f.req?.startsWith('Step') ? `기획서 핵심 시나리오 ${f.req}` : '요구사항 정의서에 없음 — DESIGN에서 추가 (확인 필요)'],
   ]
   return (
     <article id={`f-${f.id}`} className="avoid-break overflow-hidden rounded-2xl border border-neutral-200 bg-white">
@@ -179,7 +179,7 @@ function DocBody({ id }: { id: string }) {
                 <dt className="mb-1 text-[12px] font-bold text-neutral-500">원문 · 프레임 출처</dt>
                 <dd className="space-y-0.5">
                   {notionUrl(sc.id) && <a href={notionUrl(sc.id)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-700 hover:underline">Notion 화면 정의서 행 <ExternalLink size={12} /></a>}
-                  <a href={figmaUrl(sc.figmaNode)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-700 hover:underline">Figma 화면설계서 ({sc.figmaNode}) <ExternalLink size={12} /></a>
+                  <a href={figmaUrl(sc.figmaNode)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-700 hover:underline">Figma DESIGN · {sc.figmaFrame ?? sc.figmaNode} ({sc.figmaNode}) <ExternalLink size={12} /></a>
                   <p className="text-[12px] text-neutral-500">아래 프레임은 DESIGN 하이파이 스타일로 React에서 다시 그린 화면이에요</p>
                 </dd>
               </div>
@@ -214,7 +214,7 @@ function DocBody({ id }: { id: string }) {
         {/* C. 프레임과 번호별 구성 요소 */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-5">
           <h3 className="mb-1 text-[13px] font-bold tracking-wide text-neutral-500">화면과 번호별 구성 요소</h3>
-          <p className="mb-4 text-[12.5px] text-neutral-500">번호는 피그마 화면설계서 번호와 같아요{sc.type === '상태 변형' || sc.type === '모달' || sc.type === '패널' ? ' · 이 문서는 바뀌는 영역에만 번호를 달았어요' : ''}. 번호나 목록을 누르면 서로 강조돼요.</p>
+          <p className="mb-4 text-[12.5px] text-neutral-500">번호는 이 문서에서 붙인 구성 요소 번호예요 (DESIGN 프레임에는 번호가 없어요){sc.type === '상태 변형' || sc.type === '팝업' || sc.type === '패널' ? ' · 기본 화면과 달라지는 영역에만 번호를 달았어요' : ''}. 번호나 목록을 누르면 서로 강조돼요.</p>
           <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
             <AnnotatedFrame id={sc.id as ScreenId} comps={sc.components} selected={selected} onSelect={pick} onRects={onRects} />
             <ol ref={listRef} className="space-y-2 2xl:max-h-[84vh] 2xl:overflow-y-auto 2xl:pr-1">

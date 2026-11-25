@@ -12,6 +12,7 @@
   --color-wd-foot: #efefea;
   --color-wd-side: #f6f6f2;
   --color-wd-side2: #efefea;
+  --color-wd-ink: #1d2320;
 }
 
 html { font-family: Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
