@@ -163,7 +163,7 @@ export function AppTop({ crumbs, anno, guestMode = 'save' }: { crumbs: string[];
   return (
     <header {...anno} className="relative z-20 flex h-[62px] shrink-0 items-center justify-between border-b border-wd-line2 bg-white px-6">
       <div className="flex items-center gap-4 text-[14px]">
-        <button type="button" onClick={() => go(s.loggedIn ? 'MAIN-03' : 'MAIN-01')}><Logo /></button>
+        <button type="button" onClick={() => go(s.loggedIn && s.plan ? 'MAIN-03' : 'MAIN-01')}><Logo /></button>
         <span className="h-5 w-px bg-wd-line" />
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-2">

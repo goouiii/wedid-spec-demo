@@ -55,7 +55,7 @@ function detect(id: ScreenId, s: DemoState): ScreenId {
   if (p === 'HOME') return s.stages.every((x) => x.done) ? 'HOME-02' : 'HOME-01'
   if (p === 'INVITE') return s.invite === 'expired' ? 'INVITE-04' : s.invite === 'linked' ? 'INVITE-05' : 'INVITE-02'
   if (p === 'MY') return 'MY-01'
-  if (id === 'MAIN-04') return 'MAIN-03'
+  if (id === 'MAIN-04' || id === 'MAIN-03') return s.plan ? 'MAIN-03' : 'MAIN-01'
   return id
 }
 

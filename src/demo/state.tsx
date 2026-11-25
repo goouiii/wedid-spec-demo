@@ -33,7 +33,7 @@ export interface DemoState {
   band: Band
   basis: boolean
   loggedIn: boolean
-  partner: 'none' | 'joined'
+  partner: 'none' | 'invited' | 'joined'
   stages: StageState[]
   todos: Todo[][]
   view: number
@@ -48,6 +48,8 @@ export interface DemoState {
   todoOpen: boolean
   inviteOpen: boolean
   newPlanOpen: boolean
+  /** new: 새 계획(답 비움) · redo: 조건 다시 입력(지금 답 유지) */
+  newPlanMode: 'new' | 'redo'
   profileOpen: boolean
   unlinkOpen: boolean
   clearOpen: boolean
@@ -105,6 +107,10 @@ export const isPast = (s: DemoState, i: number) => !s.stages[i].done && dday(s) 
 export const pastStages = (s: DemoState) => STAGES.map((_, i) => i).filter((i) => isPast(s, i) && !s.stages[i].late)
 export const nextStage = (s: DemoState) => s.stages.findIndex((x) => !x.done)
 export const progress = (s: DemoState) => Math.round((s.stages.filter((x) => x.done).length / 6) * 100)
+/** 권장 기간이 지난 미완료 단계 (아직 안 했어요 포함) */
+export const lateStages = (s: DemoState) => STAGES.map((_, i) => i).filter((i) => isPast(s, i))
+/** 단계 권장 기간 시작일까지 남은 날 (0 이하면 지금 할 차례) */
+export const daysToStage = (s: DemoState, i: number) => daysBetween(TODAY, stageWindow(s, i).from)
 
 export function costs(s: DemoState) {
   const v = venueRange(s.a.region ?? '서울 강남권 외', s.a.guests ?? '150~200명')
@@ -118,6 +124,14 @@ export const stageBudget = (s: DemoState, i: number): [number, number] | null =>
   return m === 'venue' ? c.venue : c.sdm
 }
 export const spent = (s: DemoState) => s.stages.reduce((sum, x) => sum + (x.done && x.amount ? x.amount : 0), 0)
+export const remaining = (s: DemoState) => (s.a.budget ? Math.max(0, s.a.budget - spent(s)) : null)
+/** 예산 현황: 완료했으면 실제 금액, 아니면 예상 범위 중간값 */
+export const stageAmount = (s: DemoState, i: number) => {
+  const x = s.stages[i]
+  if (x.done && x.amount) return x.amount
+  const r = stageBudget(s, i)
+  return r ? Math.round((r[0] + r[1]) / 2) : 0
+}
 export const remainingNeed = (s: DemoState): [number, number] | null => {
   const idx = STAGES.map((_, i) => i).filter((i) => STAGES[i].money && !s.stages[i].done)
   if (!idx.length) return null
@@ -138,7 +152,7 @@ export const initialState = (): DemoState => ({
   plan: false, band: MID_BAND, basis: false, loggedIn: false, partner: 'none',
   stages: freshStages(), todos: freshTodos(), view: 1, amountText: '', editAmount: false,
   panel: false, dateModal: false, pastOpen: false, pastExpanded: null, pastAmount: '', cancelOpen: false, todoOpen: false,
-  inviteOpen: false, newPlanOpen: false, profileOpen: false, unlinkOpen: false, clearOpen: false,
+  inviteOpen: false, newPlanOpen: false, newPlanMode: 'new', profileOpen: false, unlinkOpen: false, clearOpen: false,
   login: null, loginFailNext: false, loginError: false, shared: false, calculating: false, budgetCard: '',
   compare: [], fav: ['v2', 'v1', 'v4'], chosen: null, vendor: 'v4',
   vf: { region: '서울 강남권 외', guests: '150~200명', type: '전체', priceOnly: false, favOnly: false, moods: ['화사한', '클래식'], grid: false },
@@ -166,7 +180,7 @@ export function seedFor(id: ScreenId): DemoState {
   switch (id) {
     case 'MAIN-01': case 'MAIN-02': return s0
     case 'MAIN-03': return member()
-    case 'MAIN-04': return member({ partner: 'none', newPlanOpen: true })
+    case 'MAIN-04': return member({ partner: 'none', newPlanOpen: true, newPlanMode: 'new' })
     case 'Q-01': return { ...s0, a: { ...s0.a, guests: '150~200명' } }
     case 'Q-02': return { ...s0, a: { ...s0.a, region: '서울 강남권 외', guests: '150~200명', when: { mode: 'month', date: '', year: '2027', month: '10' }, budgetText: '3,000', budget: 3000 } }
     case 'Q-03': return { ...s0, a: { ...s0.a, region: '서울 강남권 외', guests: '150~200명', when: { mode: 'month', date: '', year: '2027', month: '10' }, budgetText: '50', budget: 50 } }

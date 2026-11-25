@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, Check, ChevronRight, Copy, LogOut, MessageCircle, RotateCcw, User, UserPlus } from 'lucide-react'
+import { AlertCircle, Check, ChevronRight, Copy, Link2Off, LogOut, MessageCircle, RotateCcw, User, UserPlus } from 'lucide-react'
 import { STAGES, fmtRange } from '../data/mock'
 import { dday, initialState, isPast, seedFor, stageBudget, useAnno, useDemo, type LoginReason, type Todo } from '../demo/state'
 import { Avatar, Btn, Chip, Modal, OverlayCtx, inputCls, parseNum, ManInput } from './ui'
@@ -44,8 +44,8 @@ function InviteModal() {
   return (
     <Modal eyebrow="짝꿍 초대" title="짝꿍 초대하기" icon={<UserPlus size={20} />} onClose={close} width={460}>
       <p className="text-[14.5px] leading-6 text-neutral-600">링크를 받은 짝꿍이 로그인하면 같은 로드맵을 함께 관리할 수 있어요.</p>
-      <div {...an('INVITE-01', '01')} className="mt-5 flex items-center gap-2 rounded-[12px] bg-[#f3f3f0] py-1.5 pl-4 pr-1.5"><span className="flex-1 text-[14.5px] font-semibold">wedid.app/invite/a8f3k2</span><Btn kind="outline" onClick={() => dispatch({ type: 'toast', text: '초대 링크를 복사했어요' })} className="h-9 px-3 text-[13px]"><Copy size={13} />복사</Btn></div>
-      <Btn kind="kakao" anno={an('INVITE-01', '02')} onClick={() => dispatch({ type: 'set', patch: { inviteOpen: false, toast: '카카오톡 공유 창을 열었어요 (시연)' } })} className="mt-3 h-[52px] w-full text-[15px]"><MessageCircle size={16} className="fill-current" />카카오톡으로 보내기</Btn>
+      <div {...an('INVITE-01', '01')} className="mt-5 flex items-center gap-2 rounded-[12px] bg-[#f3f3f0] py-1.5 pl-4 pr-1.5"><span className="flex-1 text-[14.5px] font-semibold">wedid.app/invite/a8f3k2</span><Btn kind="outline" onClick={() => dispatch({ type: 'set', patch: { partner: s.partner === 'none' ? 'invited' : s.partner, toast: '초대 링크를 복사했어요 · 7일 동안 유효해요' } })} className="h-9 px-3 text-[13px]"><Copy size={13} />복사</Btn></div>
+      <Btn kind="kakao" anno={an('INVITE-01', '02')} onClick={() => dispatch({ type: 'set', patch: { inviteOpen: false, partner: s.partner === 'none' ? 'invited' : s.partner, toast: '카카오톡 공유 창을 열었어요 (시연)' } })} className="mt-3 h-[52px] w-full text-[15px]"><MessageCircle size={16} className="fill-current" />카카오톡으로 보내기</Btn>
       <p {...an('INVITE-01', '03')} className="mt-4 flex justify-between text-[12.5px] text-neutral-500"><span>초대 링크는 7일 동안 유효해요.</span><button type="button" onClick={() => { dispatch({ type: 'replace', state: seedFor('INVITE-02') }); go('INVITE-02') }} className="font-semibold text-wd-g">받는 사람 화면 보기 ›</button></p>
     </Modal>
   )
@@ -64,8 +64,10 @@ function ProfileMenu() {
         <div {...an('HOME-03', '01')} className="flex items-center gap-3 border-b border-wd-line2 px-3 pb-3 pt-2"><Avatar t="준" size={38} /><div className="leading-tight"><p className="text-[15px] font-bold">최준근</p><p className="text-[12px] text-neutral-500">{s.partner === 'joined' ? '민지 님과 연결됨' : '아직 짝꿍과 연결 전이에요'}</p></div></div>
         <div {...an('HOME-03', '02')} className="pt-1.5">
           {item(User, '내 정보', () => { close(); go('MY-01') })}
-          {item(UserPlus, '짝꿍 초대하기', () => close({ inviteOpen: true }))}
-          {item(RotateCcw, '조건 다시 입력', () => close({ newPlanOpen: true }))}
+          {s.partner === 'joined'
+            ? item(Link2Off, '짝꿍 연결 해제', () => close({ unlinkOpen: true }))
+            : item(UserPlus, '짝꿍 초대하기', () => close({ inviteOpen: true }))}
+          {item(RotateCcw, '조건 다시 입력', () => close({ newPlanOpen: true, newPlanMode: 'redo' }))}
           {item(LogOut, '로그아웃', () => { close({ loggedIn: false, toast: '로그아웃했어요' }); go('MAIN-01') })}
         </div>
       </div>
@@ -74,15 +76,27 @@ function ProfileMenu() {
   return root ? createPortal(el, root) : el
 }
 
+const PLAN_COPY = {
+  new: ['새 계획을 시작할까요?', '질문 5개에 처음부터 답해 새 예상 비용과 로드맵을 만들어요. 지금 계획의 완료 기록과 할 일은 그대로 남아요.', '새 계획 시작하기'],
+  redo: ['조건을 다시 입력할까요?', '질문 5개(지역 · 하객 수 · 예식일 · 예산 · 분위기)를 처음부터 다시 고르면 예상 비용과 로드맵이 새로 계산돼요. 지금 답이 선택된 상태로 시작해요. 완료한 단계와 할 일은 그대로 남아요.', '다시 입력하기'],
+} as const
+
 function NewPlanModal() {
   const { s, dispatch, go } = useDemo()
   const an = useAnno()
   if (!s.newPlanOpen) return null
-  const start = () => { const f = initialState(); dispatch({ type: 'replace', state: { ...s, a: f.a, plan: false, newPlanOpen: false, profileOpen: false } }); go('Q-01') }
+  const [title, body, cta] = PLAN_COPY[s.newPlanMode]
+  const close = () => dispatch({ type: 'set', patch: { newPlanOpen: false } })
+  const start = () => {
+    // 새 계획은 답변을 비우고, 조건 다시 입력은 지금 답을 그대로 둔 채 Q-01부터 시작한다
+    const a = s.newPlanMode === 'redo' ? s.a : initialState().a
+    dispatch({ type: 'replace', state: { ...s, a, plan: s.newPlanMode === 'redo', newPlanOpen: false, profileOpen: false } })
+    go('Q-01')
+  }
   return (
-    <Modal title="새 계획을 시작할까요?" anno={an('MAIN-04', '01')} onClose={() => dispatch({ type: 'set', patch: { newPlanOpen: false } })}>
-      <p className="text-[14.5px] leading-6 text-neutral-600">질문 5개에 처음부터 답해 새 예상 비용과 로드맵을 만들어요. 지금 계획의 완료 기록과 할 일은 그대로 남아요.</p>
-      <div {...an('MAIN-04', '02')} className="mt-6 grid grid-cols-2 gap-2"><Btn kind="outline" onClick={() => dispatch({ type: 'set', patch: { newPlanOpen: false } })} className="h-12 text-[15px]">취소</Btn><Btn onClick={start} className="h-12 text-[15px]">새 계획 시작하기</Btn></div>
+    <Modal title={title} anno={an('MAIN-04', '01')} onClose={close}>
+      <p className="text-[14.5px] leading-6 text-neutral-600">{body}</p>
+      <div {...an('MAIN-04', '02')} className="mt-6 grid grid-cols-2 gap-2"><Btn kind="outline" onClick={close} className="h-12 text-[15px]">취소</Btn><Btn onClick={start} className="h-12 text-[15px]">{cta}</Btn></div>
     </Modal>
   )
 }

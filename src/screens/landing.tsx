@@ -1,8 +1,8 @@
-import { ArrowRight, Calculator, Check, ChevronRight, Heart, MapPin, Users } from 'lucide-react'
-import { STAGES, VENUES } from '../data/mock'
-import { costs, dday, progress, spent, useAnno, useDemo, type ScreenId } from '../demo/state'
+import { AlertTriangle, ArrowRight, Calculator, Check, ChevronRight, Copy, Heart, MapPin, Users } from 'lucide-react'
+import { STAGES, VENUES, ymKo } from '../data/mock'
+import { costs, daysToStage, dday, lateStages, progress, remaining, stageAmount, useAnno, useDemo, weddingDate, type ScreenId } from '../demo/state'
 import { Avatar, Btn, Card, CoupleArt, DarkCard, Page, Photo, PublicFooter, PublicNav, Tag } from './ui'
-import { upcoming } from './parts'
+import { upcoming, winText } from './parts'
 
 const FEAT = [
   { Icon: Calculator, t: '비용 계산', d: '질문 5개로 우리 결혼 예상 비용 확인' },
@@ -130,18 +130,46 @@ export function MainIntro() {
 
 const CAL = Array.from({ length: 35 }, (_, i) => i) // 2026-11-01은 일요일
 
+/** 요약 카드 3번째: 짝꿍 초대 전 → 초대함 → 합류 */
+function PartnerCard() {
+  const { s, dispatch } = useDemo()
+  const copy = () => dispatch({ type: 'set', patch: { partner: 'invited', toast: '초대 링크를 복사했어요 · 7일 동안 유효해요' } })
+  return (
+    <Card className="px-7 py-6">
+      <p className="text-[13px] text-neutral-500">짝꿍</p>
+      {s.partner === 'joined' ? <p className="mt-2 text-[20px] font-bold">민지 님이 합류했어요</p> : (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-[18px] font-bold leading-snug">{s.partner === 'invited' ? <>초대함<span className="block text-[13px] font-medium text-neutral-500">합류를 기다리고 있어요</span></> : '아직 초대 전이에요'}</p>
+          <Btn kind={s.partner === 'invited' ? 'outline' : 'soft'} onClick={copy} className="h-9 shrink-0 px-3 text-[13px]"><Copy size={13} />{s.partner === 'invited' ? '링크 다시 복사' : '초대 링크 복사'}</Btn>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export function MainMember() {
   const { s, go, dispatch } = useDemo()
   const an = useAnno()
+  if (!s.plan) return <MainPublic />
   const id: ScreenId[] = ['MAIN-03']
   const c = costs(s)
   const nx = upcoming(s)
-  const budget = s.a.budget ?? 0
-  const pct = (v: number) => (budget ? Math.round((v / budget) * 100) : 0)
-  const vMid = Math.round((c.venue[0] + c.venue[1]) / 2)
-  const sMid = Math.round((c.sdm[0] + c.sdm[1]) / 2)
-  const rest = Math.max(0, budget - vMid - sMid)
+  const allDone = nx === -1
+  const est = weddingDate(s.a.when).estimated
+  const ex = est ? ' (예상)' : ''
+  const budget = s.a.budget
+  const vAmt = stageAmount(s, 1)
+  const sAmt = stageAmount(s, 2)
+  const base = budget ?? vAmt + sAmt
+  const pct = (v: number) => (base ? Math.round((v / base) * 100) : 0)
+  const rest = budget ? Math.max(0, budget - vAmt - sAmt) : 0
   const won = (man: number) => `${(man * 10000).toLocaleString('ko-KR')}원`
+  const late = lateStages(s)
+  const toBudget = () => go('ROAD-02')
+  const until = allDone ? 0 : daysToStage(s, nx)
+  const todos = allDone ? [] : s.todos[nx]
+  const vDone = s.stages[1].done && s.stages[1].amount
+  const sDone = s.stages[2].done && s.stages[2].amount
   return (
     <Page bg="bg-[#f6f5f1]">
       <PublicNav />
@@ -151,11 +179,11 @@ export function MainMember() {
           <h1 className="mt-3 text-[46px] font-bold leading-tight">우리만의 웨딩을<br />차근차근 완성해요</h1>
           <div {...an(id, '02')} className="mt-10 flex gap-3">
             <Btn onClick={() => go('ROAD-02')} className="h-14 px-7 text-[16px]">내 로드맵 이어서 보기 <ArrowRight size={16} /></Btn>
-            <Btn kind="outline" onClick={() => dispatch({ type: 'set', patch: { newPlanOpen: true } })} className="h-14 px-7 text-[16px]">새 계획 시작하기</Btn>
+            <Btn kind="outline" onClick={() => dispatch({ type: 'set', patch: { newPlanOpen: true, newPlanMode: 'new' } })} className="h-14 px-7 text-[16px]">새 계획 시작하기</Btn>
           </div>
         </div>
         <DarkCard className="px-8 py-8">
-          <div className="flex justify-between text-[13px] text-white/75"><span>전체 준비 진행률</span><span>예식 D-{dday(s)}</span></div>
+          <div className="flex justify-between text-[13px] text-white/75"><span>전체 준비 진행률</span><span>예식 D-{dday(s)}{est && ' 예상'}</span></div>
           <p className="mt-3 text-[56px] font-bold leading-none">{progress(s)}<span className="text-[26px]">%</span></p>
           <p className="mt-4 text-[13.5px] text-white/80">지금까지의 준비가 더 특별한 날을 만들어줄 거예요.</p>
           <div className="mt-5 h-1.5 rounded-full bg-white/20"><div className="h-full rounded-full bg-white" style={{ width: `${progress(s)}%` }} /></div>
@@ -163,28 +191,53 @@ export function MainMember() {
         </DarkCard>
       </section>
       <section {...an(id, '03')} className="grid grid-cols-3 gap-5 px-[60px] pt-12">
-        <Card className="px-7 py-6"><p className="text-[13px] text-neutral-500">남은 예산</p><p className="mt-2 text-[26px] font-bold">{budget ? `${(budget - spent(s)).toLocaleString('ko-KR')}만 원` : '아직 없어요'}</p></Card>
-        <Card className="px-7 py-6"><p className="text-[13px] text-neutral-500">다음 STEP · {STAGES[nx]?.short ?? '완료'}까지</p><p className="mt-2 text-[26px] font-bold">D-{Math.max(0, dday(s) - STAGES[Math.max(0, nx)].d[0])}</p></Card>
-        <Card className="px-7 py-6"><p className="text-[13px] text-neutral-500">짝꿍</p><p className="mt-2 text-[20px] font-bold">{s.partner === 'joined' ? '민지 님이 합류했어요' : '아직 초대 전이에요'}</p></Card>
+        <Card className="px-7 py-6">
+          <p className="text-[13px] text-neutral-500">남은 예산</p>
+          {budget ? <p className="mt-2 text-[26px] font-bold">{remaining(s)!.toLocaleString('ko-KR')}만 원</p> : <div className="mt-2 flex items-center justify-between"><p className="text-[20px] font-bold">예산 미입력</p><Btn kind="soft" onClick={toBudget} className="h-9 px-3 text-[13px]">예산 넣기</Btn></div>}
+        </Card>
+        <Card className="px-7 py-6">
+          {allDone ? <><p className="text-[13px] text-neutral-500">다음 STEP</p><p className="mt-2 text-[22px] font-bold">모든 단계 완료</p></> : <>
+            <p className="text-[13px] text-neutral-500">다음 STEP · {STAGES[nx].short}까지</p>
+            <p className="mt-2 text-[26px] font-bold">{until <= 0 ? <span className="text-[22px]">지금 할 차례예요</span> : <>D-{until}{est && <span className="ml-1 text-[15px] font-semibold text-neutral-500">(예상)</span>}</>}</p>
+          </>}
+        </Card>
+        <PartnerCard />
       </section>
+      {late.length > 0 && (
+        <button type="button" onClick={() => { dispatch({ type: 'set', patch: { pastOpen: true } }); go('ROAD-02') }} className="mx-[60px] mt-5 flex w-[calc(100%-120px)] items-center gap-3 rounded-[16px] border border-amber-200 bg-amber-50 px-6 py-4 text-left text-[14.5px] text-amber-900">
+          <AlertTriangle size={18} className="shrink-0 text-amber-600" />
+          <span className="flex-1"><b>확인이 필요한 단계 {late.length}개가 있어요.</b> 이미 했는지 알려주면 남은 예산을 다시 계산해 드려요.</span>
+          <span className="font-semibold">확인하기 ›</span>
+        </button>
+      )}
       <section {...an(id, '04')} className="mx-[60px] mt-6 rounded-[20px] border border-wd-line2 bg-white px-8 py-7">
         <div className="flex justify-between"><p className="text-[18px] font-bold">우리의 결혼 준비 로드맵</p><button type="button" onClick={() => go('ROAD-02')} className="text-[13.5px] font-semibold text-neutral-500">전체보기 ›</button></div>
-        <div className="mt-6 grid grid-cols-6 gap-3">{STAGES.map((st, i) => (
-          <div key={st.name} className="text-center"><span className={`mx-auto grid size-10 place-items-center rounded-full text-[14px] font-bold ${s.stages[i].done ? 'bg-wd-g text-white' : i === nx ? 'border-2 border-wd-g text-wd-g' : 'border border-wd-line text-neutral-400'}`}>{s.stages[i].done ? <Check size={17} /> : i + 1}</span><p className="mt-3 text-[13.5px] font-bold">{st.short}</p><p className={`mt-1 text-[12px] ${i === nx ? 'font-semibold text-wd-g' : 'text-neutral-500'}`}>{s.stages[i].done ? '완료' : i === nx ? '지금 할 일' : `D-${st.d[0]}~${st.d[1]}`}</p></div>
-        ))}</div>
+        <div className="mt-6 grid grid-cols-6 gap-3">{STAGES.map((st, i) => {
+          const past = late.includes(i)
+          return (
+            <div key={st.name} className="text-center"><span className={`mx-auto grid size-10 place-items-center rounded-full text-[14px] font-bold ${s.stages[i].done ? 'bg-wd-g text-white' : i === nx ? 'border-2 border-wd-g text-wd-g' : past ? 'border-2 border-amber-400 text-amber-600' : 'border border-wd-line text-neutral-400'}`}>{s.stages[i].done ? <Check size={17} /> : i + 1}</span><p className="mt-3 text-[13.5px] font-bold">{st.short}</p><p className={`mt-1 text-[12px] ${i === nx ? 'font-semibold text-wd-g' : past ? 'font-semibold text-amber-700' : 'text-neutral-500'}`}>{s.stages[i].done ? '완료' : i === nx ? '지금 할 일' : past ? '확인 필요' : `D-${st.d[0]}~${st.d[1]}`}</p></div>
+          )
+        })}</div>
       </section>
       <section className="grid grid-cols-2 gap-6 px-[60px] pt-6">
         <Card anno={an(id, '05')} className="px-8 py-7">
           <div className="flex justify-between"><p className="text-[18px] font-bold">예산 현황</p><button type="button" onClick={() => go('COST-08')} className="text-[13.5px] font-semibold text-neutral-500">상세보기 ›</button></div>
           <div className="mt-6 flex items-center gap-8">
-            <div className="relative grid size-[150px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#44695b 0 ${pct(vMid)}%, #9dbcaf 0 ${pct(vMid) + pct(sMid)}%, #ebebe6 0)` }}><div className="grid size-[108px] place-items-center rounded-full bg-white text-center"><p className="text-[11.5px] text-neutral-500">총 예산<br /><b className="text-[13px] text-wd-ink">{won(budget)}</b></p></div></div>
-            <ul className="flex-1 space-y-3 text-[13.5px]">{[['예식장 예상', vMid, 'bg-wd-g'], ['스드메 예상', sMid, 'bg-[#9dbcaf]'], ['여유 · 기타', rest, 'bg-[#ebebe6]']].map(([t, v, cls]) => <li key={t as string} className="flex items-center gap-2"><span className={`size-2.5 rounded-full ${cls}`} /><span className="flex-1 text-neutral-600">{t}</span><b>{won(v as number)}</b><span className="w-10 text-right text-neutral-500">{pct(v as number)}%</span></li>)}</ul>
+            <div className="relative grid size-[150px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#44695b 0 ${pct(vAmt)}%, #9dbcaf 0 ${pct(vAmt) + pct(sAmt)}%, #ebebe6 0)` }}>
+              <div className="grid size-[108px] place-items-center rounded-full bg-white text-center">
+                {budget ? <p className="text-[11.5px] text-neutral-500">총 예산<br /><b className="text-[13px] text-wd-ink">{won(budget)}</b></p>
+                  : <p className="text-[11px] leading-snug text-neutral-500">예상 총비용<br /><b className="text-[12px] leading-tight text-wd-ink">{c.total[0].toLocaleString('ko-KR')}만 ~<br />{c.total[1].toLocaleString('ko-KR')}만원</b><br /><button type="button" onClick={toBudget} className="mt-0.5 font-semibold text-wd-g">예산 넣기 ›</button></p>}
+              </div>
+            </div>
+            <ul className="flex-1 space-y-3 text-[13.5px]">{([[vDone ? '예식장 실제' : '예식장 예상', vAmt, 'bg-wd-g'], [sDone ? '스드메 실제' : '스드메 예상', sAmt, 'bg-[#9dbcaf]'], ...(budget ? [['여유 · 기타', rest, 'bg-[#ebebe6]']] : [])] as [string, number, string][]).map(([t, v, cls]) => <li key={t} className="flex items-center gap-2"><span className={`size-2.5 rounded-full ${cls}`} /><span className="flex-1 text-neutral-600">{t}</span><b>{won(v)}</b><span className="w-10 text-right text-neutral-500">{pct(v)}%</span></li>)}</ul>
           </div>
         </Card>
         <Card anno={an(id, '06')} className="px-8 py-7">
-          <div className="flex justify-between"><p className="text-[18px] font-bold">이번 단계 할 일</p><button type="button" onClick={() => go('STEP-01')} className="text-[13.5px] font-semibold text-neutral-500">더보기 ›</button></div>
-          <ul className="mt-5 space-y-3">{(s.todos[nx] ?? []).map((t) => <li key={t.text} className="flex items-center gap-3 text-[14.5px]"><span className={`grid size-5 place-items-center rounded-[5px] border ${t.done ? 'border-wd-g bg-wd-g text-white' : 'border-neutral-300'}`}>{t.done && <Check size={12} strokeWidth={3} />}</span><span className={`flex-1 ${t.done ? 'text-neutral-400 line-through' : ''}`}>{t.text}</span><Tag tone={t.owner === '나' ? 'dark' : 'g'}>{t.owner}</Tag></li>)}</ul>
-          <Btn kind="soft" onClick={() => go('STEP-01')} className="mt-6 h-11 w-full text-[14px]">단계 상세 보기</Btn>
+          <div className="flex justify-between"><p className="text-[18px] font-bold">이번 단계 할 일</p>{!allDone && <button type="button" onClick={() => go('STEP-01')} className="text-[13.5px] font-semibold text-neutral-500">더보기 ›</button>}</div>
+          {todos.length === 0 ? <p className="mt-5 rounded-[14px] bg-[#f6f6f2] py-8 text-center text-[14px] text-neutral-500">할 일이 없어요</p> : (
+            <ul className="mt-5 space-y-3">{todos.map((t) => <li key={t.text} className="flex items-center gap-3 text-[14.5px]"><span className={`grid size-5 place-items-center rounded-[5px] border ${t.done ? 'border-wd-g bg-wd-g text-white' : 'border-neutral-300'}`}>{t.done && <Check size={12} strokeWidth={3} />}</span><span className={`flex-1 ${t.done ? 'text-neutral-400 line-through' : ''}`}>{t.text}</span><Tag tone={t.owner === '나' ? 'dark' : 'g'}>{t.owner}</Tag></li>)}</ul>
+          )}
+          {!allDone && <Btn kind="soft" onClick={() => { dispatch({ type: 'set', patch: { view: nx, amountText: '', editAmount: false } }); go(nx === 2 ? 'STEP-03' : 'STEP-01') }} className="mt-6 h-11 w-full text-[14px]">단계 상세 보기</Btn>}
         </Card>
       </section>
       <section className="grid grid-cols-[1fr_400px] gap-6 px-[60px] pb-20 pt-6">
@@ -200,8 +253,8 @@ export function MainMember() {
             {CAL.map((i) => { const day = i + 1; if (day > 30) return <span key={i} />; return <span key={i} className={`mx-auto grid size-7 place-items-center rounded-full ${day === 15 ? 'bg-wd-g font-bold text-white' : ''}`}>{day}</span> })}
           </div>
           <div className="mt-4 space-y-2 border-t border-wd-line2 pt-4 text-[12.5px]">
-            <p className="flex justify-between"><span className="text-neutral-500">예식장 계약 권장 기간</span><b>2026.12 ~ 2027.02</b></p>
-            <p className="flex justify-between"><span className="text-neutral-500">예식일 D-{dday(s)}</span><b>2027년 10월</b></p>
+            {!allDone && <p className="flex justify-between gap-3"><span className="text-neutral-500">{STAGES[nx].short} 권장 기간</span><b>{winText(s, nx)}</b></p>}
+            <p className="flex justify-between"><span className="text-neutral-500">예식일 D-{dday(s)}</span><b>{ymKo(weddingDate(s.a.when).date)}{ex}</b></p>
           </div>
         </Card>
       </section>
