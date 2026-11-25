@@ -161,8 +161,13 @@ export function MainMember() {
   const vAmt = stageAmount(s, 1)
   const sAmt = stageAmount(s, 2)
   const base = budget ?? vAmt + sAmt
-  const pct = (v: number) => (base ? Math.round((v / base) * 100) : 0)
   const rest = budget ? Math.max(0, budget - vAmt - sAmt) : 0
+  // 디자인 기준(57 · 10 · 33): 예식장 · 스드메는 내림, 마지막 칸이 나머지를 가져가 합이 100이 되게 한다
+  const floorPct = (v: number) => (base ? Math.min(100, Math.floor((v / base) * 100 + 1e-9)) : 0)
+  const vPct = floorPct(vAmt)
+  const sPct = budget ? Math.min(100 - vPct, floorPct(sAmt)) : 100 - vPct
+  const rPct = budget ? 100 - vPct - sPct : 0
+  const pctOf: Record<string, number> = { v: vPct, s: sPct, r: rPct }
   const won = (man: number) => `${(man * 10000).toLocaleString('ko-KR')}원`
   const late = lateStages(s)
   const toBudget = () => go('ROAD-02')
@@ -223,13 +228,13 @@ export function MainMember() {
         <Card anno={an(id, '05')} className="px-8 py-7">
           <div className="flex justify-between"><p className="text-[18px] font-bold">예산 현황</p><button type="button" onClick={() => go('COST-08')} className="text-[13.5px] font-semibold text-neutral-500">상세보기 ›</button></div>
           <div className="mt-6 flex items-center gap-8">
-            <div className="relative grid size-[150px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#44695b 0 ${pct(vAmt)}%, #9dbcaf 0 ${pct(vAmt) + pct(sAmt)}%, #ebebe6 0)` }}>
+            <div className="relative grid size-[150px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#44695b 0 ${vPct}%, #9dbcaf 0 ${vPct + sPct}%, #ebebe6 0)` }}>
               <div className="grid size-[108px] place-items-center rounded-full bg-white text-center">
                 {budget ? <p className="text-[11.5px] text-neutral-500">총 예산<br /><b className="text-[13px] text-wd-ink">{won(budget)}</b></p>
                   : <p className="text-[11px] leading-snug text-neutral-500">예상 총비용<br /><b className="text-[12px] leading-tight text-wd-ink">{c.total[0].toLocaleString('ko-KR')}만 ~<br />{c.total[1].toLocaleString('ko-KR')}만원</b><br /><button type="button" onClick={toBudget} className="mt-0.5 font-semibold text-wd-g">예산 넣기 ›</button></p>}
               </div>
             </div>
-            <ul className="flex-1 space-y-3 text-[13.5px]">{([[vDone ? '예식장 실제' : '예식장 예상', vAmt, 'bg-wd-g'], [sDone ? '스드메 실제' : '스드메 예상', sAmt, 'bg-[#9dbcaf]'], ...(budget ? [['여유 · 기타', rest, 'bg-[#ebebe6]']] : [])] as [string, number, string][]).map(([t, v, cls]) => <li key={t} className="flex items-center gap-2"><span className={`size-2.5 rounded-full ${cls}`} /><span className="flex-1 text-neutral-600">{t}</span><b>{won(v)}</b><span className="w-10 text-right text-neutral-500">{pct(v)}%</span></li>)}</ul>
+            <ul className="flex-1 space-y-3 text-[13.5px]">{([['v', vDone ? '예식장 실제' : '예식장 예상', vAmt, 'bg-wd-g'], ['s', sDone ? '스드메 실제' : '스드메 예상', sAmt, 'bg-[#9dbcaf]'], ...(budget ? [['r', '여유 · 기타', rest, 'bg-[#ebebe6]']] : [])] as [string, string, number, string][]).map(([k, t, v, cls]) => <li key={k} className="flex items-center gap-2"><span className={`size-2.5 rounded-full ${cls}`} /><span className="flex-1 text-neutral-600">{t}</span><b>{won(v)}</b><span className="w-10 text-right text-neutral-500">{pctOf[k]}%</span></li>)}</ul>
           </div>
         </Card>
         <Card anno={an(id, '06')} className="px-8 py-7">
